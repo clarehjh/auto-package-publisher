@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>自动化包发布工具</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <div class="container">
+      <header>
+        <h1>🚀 自动化包发布工具</h1>
+        <p class="subtitle">一键发布到 NPM</p>
+      </header>
+
+      <main>
+        <div class="upload-section">
+          <div class="upload-card">
+            <h2>上传包文件</h2>
+
+            <form id="uploadForm" enctype="multipart/form-data">
+              <!-- 文件上传 -->
+              <div class="form-group">
+                <label for="packageFile">
+                  <span class="label-text"
+                    >选择包文件 (支持 .zip, .tgz,.tar.gz)</span
+                  >
+                  <span class="file-size">最大 100MB</span>
+                </label>
+                <div class="file-input-wrapper">
+                  <input
+                    type="file"
+                    id="packageFile"
+                    name="package"
+                    accept=".zip,.tgz,.tar.gz"
+                    required
+                  />
+                  <div class="file-input-display">
+                    <span class="file-name">未选择文件</span>
+                    <button type="button" class="btn-select">选择文件</button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 包信息 -->
+              <div class="form-row">
+                <div class="form-group">
+                  <label for="packageName">包名称 *</label>
+                  <input
+                    type="text"
+                    id="packageName"
+                    name="packageName"
+                    placeholder="例如: my-awesome-package"
+                    required
+                  />
+                </div>
+                <div class="form-group">
+                  <label for="version">版本号 *</label>
+                  <input
+                    type="text"
+                    id="version"
+                    name="version"
+                    placeholder="例如: 1.0.0"
+                    required
+                  />
+                </div>
+              </div>
+
+              <!-- GitHub仓库信息（可选） -->
+              <div id="githubConfig" class="config-section">
+                <h3>GitHub 仓库信息（可选）</h3>
+                <div class="form-group">
+                  <label for="githubRepo">仓库地址 (格式: owner/repo)</label>
+                  <input
+                    type="text"
+                    id="githubRepo"
+                    name="githubRepo"
+                    placeholder="例如: username/my-package"
+                  />
+                  <small
+                    >用于在 package.json 的 repository 字段指向源码仓库</small
+                  >
+                </div>
+              </div>
+
+              <!-- NPM配置 -->
+              <div id="npmConfig" class="config-section">
+                <h3>NPM 配置</h3>
+                <div class="form-group">
+                  <label for="npmRegistry">Registry</label>
+                  <input
+                    type="text"
+                    id="npmRegistry"
+                    name="npmRegistry"
+                    value="https://registry.npmjs.org/"
+                  />
+                </div>
+                <div class="form-group">
+                  <label for="npmToken">NPM Token</label>
+                  <input
+                    type="password"
+                    id="npmToken"
+                    name="npmToken"
+                    placeholder="留空则使用环境变量配置"
+                  />
+                </div>
+              </div>
+
+              <!-- 提交按钮 -->
+              <button type="submit" class="btn-submit" id="submitBtn">
+                <span class="btn-text">🚀 开始发布</span>
+                <span class="btn-loading">发布中...</span>
+              </button>
+            </form>
+          </div>
+        </div>
+
+        <!-- 结果显示 -->
+        <div id="resultSection" class="result-section hidden">
+          <div class="result-card">
+            <h2>发布结果</h2>
+            <div id="resultContent"></div>
+            <button class="btn-secondary" onclick="resetForm()">
+              继续发布
+            </button>
+          </div>
+        </div>
+
+        <!-- 状态信息 -->
+        <div id="statusSection" class="status-section hidden">
+          <div class="status-card">
+            <h3>发布状态</h3>
+            <div id="statusContent"></div>
+          </div>
+        </div>
+      </main>
+
+      <footer>
+        <p>&copy; clare 自动化包发布工具 | 安全便捷的包管理解决方案</p>
+      </footer>
+    </div>
+
+    <script src="app.js"></script>
+  </body>
+</html>
