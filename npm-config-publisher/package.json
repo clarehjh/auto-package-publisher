@@ -14,12 +14,12 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/yourname/npm-config-publisher.git"
+    "url": "git+https://github.com/clarehjh/npm-config-publisher.git"
   },
   "bugs": {
-    "url": "https://github.com/yourname/npm-config-publisher/issues"
+    "url": "https://github.com/clarehjh/npm-config-publisher/issues"
   },
-  "homepage": "https://github.com/yourname/npm-config-publisher#readme",
+  "homepage": "https://github.com/clarehjh/npm-config-publisher#readme",
   "scripts": {
     "start": "node src/index.js",
     "test": "echo \"Error: no test specified\" && exit 1",
@@ -32,7 +32,7 @@
     "ci-cd",
     "config"
   ],
-  "author": "Your Name <you@example.com>",
+  "author": "clarehjh",
   "license": "MIT",
   "dependencies": {
     "commander": "^11.1.0",

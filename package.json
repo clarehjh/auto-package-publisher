@@ -13,7 +13,11 @@
     "publisher",
     "automation"
   ],
-  "author": "",
+    "repository": {
+    "type": "git",
+    "url": "git+https://github.com/clarehjh/auto-package-publisher .git"
+  },
+  "author": "clarehjh",
   "license": "MIT",
   "dependencies": {
     "express": "^4.18.2",
