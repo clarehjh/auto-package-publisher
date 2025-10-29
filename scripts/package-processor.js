@@ -27,52 +27,92 @@ async function processPackage(filePath, uploadId, options) {
       // 验证.tgz文件结构
       const isValidTGZ = await validateTGZStructure(filePath);
 
-      if (isValidTGZ) {
-        // 将.tgz复制到processed目录并重命名
-        const destPath = path.join(
-          __dirname,
-          "../processed",
-          `${packageName}-${version}.tgz`
-        );
-        await fs.copy(filePath, destPath);
-        releasePath = destPath;
-      } else {
-        log("检测到.tgz文件结构不正确，重新打包");
-        // 提取并重新打包
-        const extractedPath = path.join(processedPath, "extracted");
-        await fs.ensureDir(extractedPath);
+      // 总是解包并重打包，确保内置 name/version 与参数一致
+      const extractedPath = path.join(processedPath, "extracted");
+      await fs.ensureDir(extractedPath);
 
-        // 解压.tgz文件
+      let needRepack = true;
+
+      if (isValidTGZ) {
         try {
           execSync(`tar -xzf "${filePath}" -C "${extractedPath}"`, {
             stdio: "ignore",
           });
         } catch {
-          // 如果tar命令失败，尝试使用Node.js解压
-          const zlib = require("zlib");
-          const tar = require("tar-stream");
-          // 简化处理：直接复制使用
-          await fs.copy(filePath, path.join(processedPath, "temp.tgz"));
+          needRepack = true;
         }
 
-        // 查找提取后的文件
-        const files = await fs.readdir(extractedPath);
-        let actualSourceDir = extractedPath;
+        // 读取解包后的 package.json 做比对
+        if (!needRepack) {
+          let pkgDir = extractedPath;
+          const files = await fs.readdir(extractedPath);
+          for (const file of files) {
+            const fullPath = path.join(extractedPath, file);
+            const stats = await fs.stat(fullPath);
+            if (stats.isDirectory() && (file === "package" || true)) {
+              const pj = path.join(fullPath, "package.json");
+              if (await fs.pathExists(pj)) {
+                pkgDir = fullPath;
+                break;
+              }
+            }
+          }
 
-        // 如果已经包含了package目录，使用它，否则创建
-        for (const file of files) {
-          const fullPath = path.join(extractedPath, file);
+          const pjPath = path.join(pkgDir, "package.json");
+          if (await fs.pathExists(pjPath)) {
+            const pj = await fs.readJson(pjPath);
+            if (pj.name !== packageName || pj.version !== version) {
+              needRepack = true;
+              await updatePackageJson(
+                pjPath,
+                packageName,
+                version,
+                options?.npmRegistry ||
+                  options?.registry ||
+                  options?.npmRegistry,
+                options?.githubRepo
+              );
+            }
+          } else {
+            needRepack = true;
+            await createDefaultPackageJson(
+              pkgDir,
+              packageName,
+              version,
+              options
+            );
+          }
+        }
+      }
+
+      if (needRepack) {
+        if (!(await fs.pathExists(extractedPath))) {
+          await fs.ensureDir(extractedPath);
+        }
+        // 若未成功解包，再次尝试解包；若仍失败，直接抛错让上层感知
+        try {
+          execSync(`tar -xzf "${filePath}" -C "${extractedPath}"`, {
+            stdio: "ignore",
+          });
+        } catch (e) {
+          log(`.tgz 解包失败: ${e.message}`);
+        }
+
+        // 查找实际源码目录
+        const files2 = await fs.readdir(extractedPath);
+        let actualSourceDir = extractedPath;
+        for (const f of files2) {
+          const fullPath = path.join(extractedPath, f);
           const stats = await fs.stat(fullPath);
           if (stats.isDirectory()) {
-            const testPackageJson = path.join(fullPath, "package.json");
-            if (await fs.pathExists(testPackageJson)) {
+            const pj = path.join(fullPath, "package.json");
+            if (await fs.pathExists(pj)) {
               actualSourceDir = fullPath;
               break;
             }
           }
         }
 
-        // 创建package.json如果不存在
         const packageJsonPath = path.join(actualSourceDir, "package.json");
         if (!(await fs.pathExists(packageJsonPath))) {
           await createDefaultPackageJson(
@@ -81,14 +121,30 @@ async function processPackage(filePath, uploadId, options) {
             version,
             options
           );
+        } else {
+          await updatePackageJson(
+            packageJsonPath,
+            packageName,
+            version,
+            options?.npmRegistry || options?.registry || options?.npmRegistry,
+            options?.githubRepo
+          );
         }
 
-        // 重新打包
         releasePath = await createReleasePackage(
           actualSourceDir,
           packageName,
           version
         );
+      } else {
+        // 版本与名称一致，直接复制重命名
+        const destPath = path.join(
+          __dirname,
+          "../processed",
+          `${packageName}-${version}.tgz`
+        );
+        await fs.copy(filePath, destPath);
+        releasePath = destPath;
       }
     } else if (ext === ".zip") {
       log("检测到.zip文件");
@@ -116,7 +172,7 @@ async function processPackage(filePath, uploadId, options) {
         }
       }
 
-      // 创建package.json如果不存在
+      // 创建/更新 package.json，确保与参数一致
       const packageJsonPath = path.join(actualSourceDir, "package.json");
       if (!(await fs.pathExists(packageJsonPath))) {
         await createDefaultPackageJson(
@@ -124,6 +180,14 @@ async function processPackage(filePath, uploadId, options) {
           packageName,
           version,
           options
+        );
+      } else {
+        await updatePackageJson(
+          packageJsonPath,
+          packageName,
+          version,
+          options?.npmRegistry || options?.registry || options?.npmRegistry,
+          options?.githubRepo
         );
       }
 
@@ -271,7 +335,8 @@ async function updatePackageJson(
   packagePath,
   packageName,
   version,
-  npmRegistry
+  npmRegistry,
+  githubRepo
 ) {
   const packageJson = await fs.readJson(packagePath);
 
@@ -284,6 +349,18 @@ async function updatePackageJson(
     packageJson.publishConfig = {};
   }
   packageJson.publishConfig.registry = npmRegistry;
+
+  // 更新 repository（若有提供）
+  if (githubRepo) {
+    packageJson.repository = {
+      type: "git",
+      url: `git+https://github.com/${githubRepo}.git`,
+    };
+    packageJson.bugs = {
+      url: `https://github.com/${githubRepo}/issues`,
+    };
+    packageJson.homepage = `https://github.com/${githubRepo}#readme`;
+  }
 
   await fs.writeJson(packagePath, packageJson, { spaces: 2 });
   log(`已更新package.json: ${packageName}@${version}`);

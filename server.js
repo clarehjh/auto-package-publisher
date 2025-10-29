@@ -10,6 +10,14 @@ require("dotenv").config();
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// 全局错误兜底，避免进程直接退出导致连接被重置
+process.on("uncaughtException", (err) => {
+  console.error("[uncaughtException]", err);
+});
+process.on("unhandledRejection", (reason) => {
+  console.error("[unhandledRejection]", reason);
+});
+
 // 中间件
 app.use(cors());
 app.use(express.json());
@@ -74,6 +82,10 @@ app.post("/api/upload", upload.single("package"), async (req, res) => {
   );
 
   const uploadId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+  // 计算上传文件的绝对路径（兼容 multer 不同字段）
+  const uploadedFilePath =
+    req.file.path || path.join(uploadsDir, req.file.filename);
 
   try {
     // 处理包（解压、验证、准备发布文件）
@@ -147,8 +159,15 @@ app.post("/api/upload", upload.single("package"), async (req, res) => {
 
     // 清理临时文件
     try {
-      await fs.remove(req.file.path);
+      if (uploadedFilePath) {
+        await fs.remove(uploadedFilePath);
+      }
       await fs.remove(packageInfo.path);
+      // 清理本次处理的临时目录 processed/<uploadId>
+      const uploadTempDir = path.join(processedDir, uploadId);
+      if (await fs.pathExists(uploadTempDir)) {
+        await fs.remove(uploadTempDir);
+      }
       log("临时文件已清理");
     } catch (cleanupError) {
       log(`清理临时文件失败: ${cleanupError.message}`);
@@ -194,6 +213,19 @@ app.post("/api/upload", upload.single("package"), async (req, res) => {
     });
   } catch (error) {
     log(`处理失败: ${error.message}`);
+    // 失败同样尝试清理上传文件和临时目录
+    try {
+      if (uploadedFilePath) {
+        await fs.remove(uploadedFilePath);
+      }
+      const uploadTempDir = path.join(processedDir, uploadId);
+      if (await fs.pathExists(uploadTempDir)) {
+        await fs.remove(uploadTempDir);
+      }
+    } catch (e) {
+      log(`失败清理未完成: ${e.message}`);
+    }
+
     res.status(500).json({
       success: false,
       message: error.message,

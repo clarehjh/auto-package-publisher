@@ -1,0 +1,5 @@
+{
+  "watch": ["server.js", "scripts", "public"],
+  "ignore": [".npmrc", "processed/**", "uploads/**", "**/*.tgz"],
+  "ext": "js,json,html,css"
+}

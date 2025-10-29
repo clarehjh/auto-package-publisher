@@ -1,6 +1,7 @@
 const { execSync } = require("child_process");
 const path = require("path");
 const fs = require("fs-extra");
+const os = require("os");
 
 /**
  * 发布包到NPM
@@ -14,15 +15,13 @@ async function publishToNPM(
   log("开始发布到NPM...");
 
   try {
-    // 设置NPM token
-    const npmrcPath = path.join(__dirname, "../.npmrc");
+    // 在临时目录创建隔离的 npmrc，避免触发 nodemon 重启
+    const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "npm-pub-"));
+    const npmrcPath = path.join(tmpDir, ".npmrc");
     const npmrcContent = `//${
       new URL(registry).hostname
     }/:_authToken=${npmToken}`;
     await fs.writeFile(npmrcPath, npmrcContent);
-
-    // 设置NPM registry
-    process.env.npm_config_registry = registry;
 
     // 处理选项
     const access = options.access || "public";
@@ -38,14 +37,16 @@ async function publishToNPM(
       env: {
         ...process.env,
         npm_config_loglevel: "error",
+        NPM_CONFIG_USERCONFIG: npmrcPath,
+        npm_config_registry: registry,
       },
       stdio: "pipe",
     });
 
     log(`NPM发布成功: ${output}`);
 
-    // 清理.npmrc
-    await fs.remove(npmrcPath);
+    // 清理临时 npmrc
+    await fs.remove(tmpDir);
 
     return {
       success: true,
@@ -55,12 +56,12 @@ async function publishToNPM(
     };
   } catch (error) {
     log(`NPM发布失败: ${error.message}`);
-
-    // 清理.npmrc
-    const npmrcPath = path.join(__dirname, "../.npmrc");
-    if (await fs.pathExists(npmrcPath)) {
-      await fs.remove(npmrcPath);
-    }
+    // 清理临时目录（若已创建）
+    try {
+      if (typeof tmpDir === "string") {
+        await fs.remove(tmpDir);
+      }
+    } catch {}
 
     return {
       success: false,
