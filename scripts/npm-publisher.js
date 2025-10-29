@@ -8,7 +8,8 @@ const fs = require("fs-extra");
 async function publishToNPM(
   packagePath,
   npmToken,
-  registry = "https://registry.npmjs.org/"
+  registry = "https://registry.npmjs.org/",
+  options = {}
 ) {
   log("开始发布到NPM...");
 
@@ -23,8 +24,13 @@ async function publishToNPM(
     // 设置NPM registry
     process.env.npm_config_registry = registry;
 
+    // 处理选项
+    const access = options.access || "public";
+    const tag = options.tag ? ` --tag ${options.tag}` : "";
+    const dryRun = options.dryRun ? " --dry-run" : "";
+
     // 执行npm publish
-    const command = `npm publish "${packagePath}" --access public`;
+    const command = `npm publish "${packagePath}" --access ${access}${tag}${dryRun}`;
     log(`执行命令: ${command}`);
 
     const output = execSync(command, {

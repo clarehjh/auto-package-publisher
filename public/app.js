@@ -50,8 +50,18 @@ uploadForm.addEventListener("submit", async (e) => {
   // NPM配置
   const npmRegistry = document.getElementById("npmRegistry").value;
   const npmToken = document.getElementById("npmToken").value;
+  const access = document.getElementById("access").value || "public";
+  const tag = document.getElementById("tag").value || "";
+  const dryRun = document.getElementById("dryRun").checked ? "true" : "false";
+  const skipExisting = document.getElementById("skipExisting").checked
+    ? "true"
+    : "false";
   formData.append("npmRegistry", npmRegistry);
   if (npmToken) formData.append("npmToken", npmToken);
+  formData.append("access", access);
+  if (tag) formData.append("tag", tag);
+  formData.append("dryRun", dryRun);
+  formData.append("skipExisting", skipExisting);
 
   // 显示状态
   showStatus("准备上传文件...");
@@ -203,6 +213,58 @@ function resetForm() {
 // 初始化
 document.addEventListener("DOMContentLoaded", () => {
   console.log("自动化包发布工具已加载");
+
+  // 恢复上次输入
+  try {
+    const last = JSON.parse(localStorage.getItem("publisher:last") || "null");
+    if (last) {
+      if (last.packageName)
+        document.getElementById("packageName").value = last.packageName;
+      if (last.version) document.getElementById("version").value = last.version;
+      if (last.githubRepo)
+        document.getElementById("githubRepo").value = last.githubRepo;
+      if (last.npmRegistry)
+        document.getElementById("npmRegistry").value = last.npmRegistry;
+      if (last.access) document.getElementById("access").value = last.access;
+      if (typeof last.dryRun === "boolean")
+        document.getElementById("dryRun").checked = last.dryRun;
+      if (typeof last.skipExisting === "boolean")
+        document.getElementById("skipExisting").checked = last.skipExisting;
+      if (last.tag) document.getElementById("tag").value = last.tag;
+    }
+  } catch {}
+
+  // 监听输入并保存
+  const persist = () => {
+    const data = {
+      packageName: document.getElementById("packageName").value,
+      version: document.getElementById("version").value,
+      githubRepo: document.getElementById("githubRepo").value,
+      npmRegistry: document.getElementById("npmRegistry").value,
+      access: document.getElementById("access").value,
+      dryRun: document.getElementById("dryRun").checked,
+      skipExisting: document.getElementById("skipExisting").checked,
+      tag: document.getElementById("tag").value,
+    };
+    localStorage.setItem("publisher:last", JSON.stringify(data));
+  };
+
+  [
+    "packageName",
+    "version",
+    "githubRepo",
+    "npmRegistry",
+    "access",
+    "dryRun",
+    "skipExisting",
+    "tag",
+  ].forEach((id) => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener("input", persist);
+    if (el && (el.type === "checkbox" || el.tagName === "SELECT")) {
+      el.addEventListener("change", persist);
+    }
+  });
 
   // 检查健康状态
   fetch("/api/health")

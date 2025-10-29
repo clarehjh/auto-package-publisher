@@ -1,0 +1,44 @@
+{
+  "packages": [
+    {
+      "name": "@myorg/ui-components",
+      "version": "1.2.3",
+      "path": "./packages/ui/dist",
+      "registry": "https://registry.npmjs.org/",
+      "access": "public",
+      "tag": "latest"
+    },
+    {
+      "name": "@myorg/utils",
+      "version": "2.0.1",
+      "path": "./packages/utils/dist",
+      "registry": "https://registry.npmjs.org/",
+      "access": "public",
+      "tag": "latest"
+    },
+    {
+      "name": "@myorg/core",
+      "version": "3.1.0",
+      "path": "./packages/core/dist",
+      "registry": "https://registry.npmjs.org/",
+      "access": "restricted",
+      "tag": "latest"
+    }
+  ],
+  "auth": {
+    "npm": {
+      "token": "${NPM_TOKEN}"
+    }
+  },
+  "options": {
+    "dryRun": false,
+    "skipExisting": true,
+    "autoVersion": false,
+    "cleanup": true,
+    "parallel": false
+  },
+  "hooks": {
+    "prePublish": "npm run build",
+    "postPublish": "npm run test"
+  }
+}

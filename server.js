@@ -2,7 +2,7 @@ const express = require("express");
 const multer = require("multer");
 const path = require("path");
 const fs = require("fs-extra");
-const { publishToNPM } = require("./scripts/npm-publisher");
+const { publishToNPM, checkVersionExists } = require("./scripts/npm-publisher");
 const { processPackage } = require("./scripts/package-processor");
 const cors = require("cors");
 require("dotenv").config();
@@ -56,6 +56,10 @@ app.post("/api/upload", upload.single("package"), async (req, res) => {
     npmToken,
     githubRepo,
     npmRegistry = "https://registry.npmjs.org/",
+    access = "public",
+    tag = "",
+    dryRun = "false",
+    skipExisting = "true",
   } = req.body;
 
   if (!packageName || !version) {
@@ -99,10 +103,35 @@ app.post("/api/upload", upload.single("package"), async (req, res) => {
         );
       }
 
-      npmResult = await publishToNPM(packageInfo.path, token, npmRegistry);
+      // 版本存在则可选择跳过
+      if (String(skipExisting).toLowerCase() === "true") {
+        const exists = await checkVersionExists(
+          packageName,
+          version,
+          npmRegistry
+        );
+        if (exists) {
+          npmResult = {
+            success: true,
+            message: `版本已存在，已跳过发布: ${packageName}@${version}`,
+            skipped: true,
+          };
+          throw new Error("__skip_publish__");
+        }
+      }
+
+      npmResult = await publishToNPM(packageInfo.path, token, npmRegistry, {
+        access,
+        tag,
+        dryRun: String(dryRun).toLowerCase() === "true",
+      });
       log(`NPM发布结果: ${JSON.stringify(npmResult)}`);
     } catch (error) {
       let errorMessage = error.message;
+      if (errorMessage === "__skip_publish__") {
+        // 已在上面设置 npmResult
+        errorMessage = npmResult.message;
+      }
 
       // 检查是否是24小时重复发布限制
       if (errorMessage.includes("cannot be republished until 24 hours")) {
@@ -110,7 +139,9 @@ app.post("/api/upload", upload.single("package"), async (req, res) => {
           "该版本已在24小时内发布过，请等待24小时后重试或发布新版本";
       }
 
-      npmResult = { success: false, message: errorMessage };
+      if (!npmResult || !npmResult.success) {
+        npmResult = { success: false, message: errorMessage };
+      }
       log(`NPM发布失败: ${errorMessage}`);
     }
 
@@ -121,6 +152,32 @@ app.post("/api/upload", upload.single("package"), async (req, res) => {
       log("临时文件已清理");
     } catch (cleanupError) {
       log(`清理临时文件失败: ${cleanupError.message}`);
+    }
+
+    // 记录历史
+    try {
+      const historyPath = path.join(processedDir, "history.json");
+      const item = {
+        time: new Date().toISOString(),
+        uploadId,
+        packageName,
+        version,
+        filename: req.file.originalname,
+        registry: npmRegistry,
+        tag: tag || "latest",
+        access,
+        success: npmResult.success,
+        message: npmResult.message || "",
+      };
+      let history = [];
+      if (await fs.pathExists(historyPath)) {
+        history = await fs.readJson(historyPath).catch(() => []);
+      }
+      history.unshift(item);
+      if (history.length > 100) history = history.slice(0, 100);
+      await fs.writeJson(historyPath, history, { spaces: 2 });
+    } catch (e) {
+      log(`写入历史失败: ${e.message}`);
     }
 
     res.json({
@@ -145,14 +202,18 @@ app.post("/api/upload", upload.single("package"), async (req, res) => {
   }
 });
 
-// 获取历史记录（简化版）
-app.get("/api/history", (req, res) => {
-  // 这里可以读取日志文件返回历史记录
-  res.json({
-    success: true,
-    history: [],
-    message: "历史记录功能待完善",
-  });
+// 获取历史记录
+app.get("/api/history", async (req, res) => {
+  try {
+    const historyPath = path.join(processedDir, "history.json");
+    let history = [];
+    if (await fs.pathExists(historyPath)) {
+      history = await fs.readJson(historyPath).catch(() => []);
+    }
+    res.json({ success: true, history });
+  } catch (e) {
+    res.json({ success: false, history: [], message: e.message });
+  }
 });
 
 // 健康检查

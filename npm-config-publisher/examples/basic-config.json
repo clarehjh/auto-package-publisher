@@ -1,0 +1,31 @@
+{
+  "packages": [
+    {
+      "name": "my-awesome-package",
+      "version": "1.0.0",
+      "path": "./dist",
+      "registry": "https://registry.npmjs.org/",
+      "access": "public",
+      "tag": "latest"
+    },
+    {
+      "name": "my-scoped-package",
+      "version": "2.1.0",
+      "path": "./packages/scoped",
+      "registry": "https://registry.npmjs.org/",
+      "access": "public",
+      "tag": "beta"
+    }
+  ],
+  "auth": {
+    "npm": {
+      "token": "${NPM_TOKEN}"
+    }
+  },
+  "options": {
+    "dryRun": false,
+    "skipExisting": true,
+    "autoVersion": false,
+    "cleanup": true
+  }
+}

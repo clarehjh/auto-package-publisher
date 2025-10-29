@@ -1,0 +1,148 @@
+name: Publish to NPM (Monorepo)
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+    tags:
+      - "v*"
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  detect-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      packages: ${{ steps.changes.outputs.packages }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect changed packages
+        id: changes
+        run: |
+          # 检测变更的包
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            CHANGED_FILES=$(git diff --name-only ${{ github.event.pull_request.base.sha }} ${{ github.sha }})
+          else
+            CHANGED_FILES=$(git diff --name-only HEAD~1 HEAD)
+          fi
+
+          echo "Changed files:"
+          echo "$CHANGED_FILES"
+
+          # 检测哪些包发生了变化
+          CHANGED_PACKAGES=""
+          for package in packages/*/; do
+            package_name=$(basename "$package")
+            if echo "$CHANGED_FILES" | grep -q "^packages/$package_name/"; then
+              CHANGED_PACKAGES="$CHANGED_PACKAGES $package_name"
+            fi
+          done
+
+          echo "packages=$CHANGED_PACKAGES" >> $GITHUB_OUTPUT
+
+  build-and-test:
+    runs-on: ubuntu-latest
+    needs: detect-changes
+    if: needs.detect-changes.outputs.packages != ''
+    strategy:
+      matrix:
+        package: ${{ fromJson(format('["{0}"]', needs.detect-changes.outputs.packages)) }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "18"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build package
+        run: npm run build --workspace=packages/${{ matrix.package }}
+
+      - name: Test package
+        run: npm run test --workspace=packages/${{ matrix.package }}
+
+  publish:
+    runs-on: ubuntu-latest
+    needs: [detect-changes, build-and-test]
+    if: github.ref == 'refs/heads/main' && startsWith(github.ref, 'refs/tags/v')
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "18"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build all packages
+        run: npm run build
+
+      - name: Install npm-config-publisher
+        run: npm install -g npm-config-publisher
+
+      - name: Generate publish config
+        run: |
+          # 根据变更的包生成发布配置
+          CHANGED_PACKAGES="${{ needs.detect-changes.outputs.packages }}"
+          echo "{" > .github/publish-config.json
+          echo '  "packages": [' >> .github/publish-config.json
+
+          first=true
+          for package in $CHANGED_PACKAGES; do
+            if [ "$first" = true ]; then
+              first=false
+            else
+              echo "," >> .github/publish-config.json
+            fi
+            
+            echo "    {" >> .github/publish-config.json
+            echo "      \"name\": \"@myorg/$package\"," >> .github/publish-config.json
+            echo "      \"version\": \"$(node -p \"require('./packages/$package/package.json').version\")\"," >> .github/publish-config.json
+            echo "      \"path\": \"./packages/$package/dist\"," >> .github/publish-config.json
+            echo "      \"registry\": \"https://registry.npmjs.org/\"," >> .github/publish-config.json
+            echo "      \"access\": \"public\"," >> .github/publish-config.json
+            echo "      \"tag\": \"latest\"" >> .github/publish-config.json
+            echo "    }" >> .github/publish-config.json
+          done
+
+          echo "  ]," >> .github/publish-config.json
+          echo '  "auth": {" >> .github/publish-config.json
+          echo '    "npm": {" >> .github/publish-config.json
+          echo '      "token": "${NPM_TOKEN}"' >> .github/publish-config.json
+          echo '    }' >> .github/publish-config.json
+          echo '  },' >> .github/publish-config.json
+          echo '  "options": {' >> .github/publish-config.json
+          echo '    "dryRun": false,' >> .github/publish-config.json
+          echo '    "skipExisting": true' >> .github/publish-config.json
+          echo '  }' >> .github/publish-config.json
+          echo "}" >> .github/publish-config.json
+
+      - name: Publish to NPM
+        run: npm-config-publish publish --config .github/publish-config.json
+        env:
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Create GitHub Release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: Release ${{ github.ref }}
+          draft: false
+          prerelease: false

@@ -95,6 +95,26 @@
                     value="https://registry.npmjs.org/"
                   />
                 </div>
+                <div class="form-row">
+                  <div class="form-group">
+                    <label for="access">Access</label>
+                    <select id="access" name="access">
+                      <option value="public" selected>public</option>
+                      <option value="restricted">restricted</option>
+                    </select>
+                    <small>私有 scope 包通常也需要 public 才能安装</small>
+                  </div>
+                  <div class="form-group">
+                    <label for="tag">Tag</label>
+                    <input
+                      type="text"
+                      id="tag"
+                      name="tag"
+                      placeholder="默认 latest"
+                    />
+                    <small>如 beta/next/canary</small>
+                  </div>
+                </div>
                 <div class="form-group">
                   <label for="npmToken">NPM Token</label>
                   <input
@@ -103,6 +123,20 @@
                     name="npmToken"
                     placeholder="留空则使用环境变量配置"
                   />
+                </div>
+                <div class="form-row">
+                  <div class="form-group">
+                    <label
+                      ><input type="checkbox" id="dryRun" /> Dry
+                      run（不实际发布）</label
+                    >
+                  </div>
+                  <div class="form-group">
+                    <label
+                      ><input type="checkbox" id="skipExisting" checked />
+                      版本存在时跳过</label
+                    >
+                  </div>
                 </div>
               </div>
 

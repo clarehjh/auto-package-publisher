@@ -1,0 +1,54 @@
+{
+  "name": "npm-config-publisher",
+  "version": "1.0.0",
+  "description": "配置化的NPM包发布工具 - 支持CI/CD和自动化发布",
+  "main": "src/index.js",
+  "bin": {
+    "npm-config-publish": "./bin/cli.js"
+  },
+  "files": [
+    "bin/",
+    "src/",
+    "README.md",
+    "LICENSE"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yourname/npm-config-publisher.git"
+  },
+  "bugs": {
+    "url": "https://github.com/yourname/npm-config-publisher/issues"
+  },
+  "homepage": "https://github.com/yourname/npm-config-publisher#readme",
+  "scripts": {
+    "start": "node src/index.js",
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "publish:example": "node bin/cli.js --config examples/basic-config.json"
+  },
+  "keywords": [
+    "npm",
+    "publisher",
+    "automation",
+    "ci-cd",
+    "config"
+  ],
+  "author": "Your Name <you@example.com>",
+  "license": "MIT",
+  "dependencies": {
+    "commander": "^11.1.0",
+    "chalk": "^4.1.2",
+    "inquirer": "^8.2.6",
+    "fs-extra": "^11.1.1",
+    "archiver": "^6.0.1",
+    "unzipper": "^0.10.14",
+    "dotenv": "^16.3.1",
+    "semver": "^7.5.4",
+    "glob": "^10.3.10"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.2"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  }
+}

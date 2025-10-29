@@ -1,0 +1,12 @@
+# Exclude non-runtime assets
+examples/
+docs/
+templates/
+processed/
+uploads/
+PROJECT_SUMMARY.md
+install.sh
+pnpm-lock.yaml
+yarn.lock
+*.log
+.DS_Store
